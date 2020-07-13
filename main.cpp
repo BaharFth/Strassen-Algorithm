@@ -2,11 +2,13 @@
 //Approach 1
 //by Bahar Fathi
 //July 2020
+#include <chrono>
 #include <iostream>
 #include <vector>
 #include <thread>
 #include <string>
 #include <sstream>
+#include <math.h>
 
 using namespace std;
 
@@ -64,37 +66,83 @@ void insertCornerMatrix(Matrix &A, Matrix &Axy,int x, int y);
 //fills a given Matrix A with its corner matrices
 void insertAllCornerMatrices(Matrix &A, matrixVector &cornersA);
 
+//Make a matrix of random numbers of size NxN
+Matrix intitializeRandomMatrix(int N, int rangeLength, int rangeOffset);
+
+
+//classes-----------------------------------------------------------------------------------
+class Timer
+{
+public:
+    chrono::time_point<chrono::high_resolution_clock> startTimePoint;
+    Timer(){ startTimePoint = chrono::high_resolution_clock::now();    }
+    ~Timer(){}
+
+    double getRuntime()
+    {
+        auto endTimePoint = chrono::high_resolution_clock::now();
+        auto start = chrono::time_point_cast<chrono::microseconds> (startTimePoint).time_since_epoch().count();
+        auto end = chrono::time_point_cast<chrono::microseconds> (endTimePoint).time_since_epoch().count();
+        auto duration = end - start;
+        return duration;
+    }
+};
+
 
 //Main---------------------------------------------------------------------
 int main()
 {
-    Matrix A = {{1, 2, 4,0}, {3 ,-1 ,1 , 0},{3, 0, -2, 1},{0 ,1 ,-2, 3}};
-    Matrix B = {{-2,1 ,0 ,-1},{-1,3 ,2 ,1}, {2,1,0,-2}, {2, 3, 1, 0}};
-
-    //Matrix A = {{1, 2}, {3 ,-1 }};
-    //Matrix B = {{-2,1},{-1,3}};
-
-    int N = A.size();
-
-    //C=A*B is calculated by two algorithms 1. Strassen 2. Standard (brute force)
-    //The results are printed for comparison
-
-    // There should be a way around the need to initializing a Matrix in advance
-    // Not sure why my code does not compile without this initialization. tried
-    // different strategies, need to look into it when there is time
-    Matrix C = intitializeMatrix(N);
-    recursiveStrassen(A,B,C);
-    display(C, "C by Strassen");
-
-    Matrix D = intitializeMatrix(N);
-    bruteForceMultiply(A,B,D);
-    display(C, "C by Brute Force");
-
-    return 0;
+    int N; //matrix Size
+    int n = 5; //log2(N)
+    int num = 50;    //number of runs per matrix size
+    int rangeLength = 100;
+    int rangeOffset = rangeLength/2;
+    int hardwareConcurrency = thread::hardware_concurrency();
+    cout<<"Benchmarking Strassen for:"<<endl
+    <<"n = 1 : "<<n-1<<endl
+    <<"numbers between -"<<rangeOffset<<" and "<< rangeLength-rangeOffset<<endl
+    <<"averaged over "<<num <<" runs"<<endl
+    <<"hardwareConcurrency: " <<hardwareConcurrency<<endl;
+    // for integers from 1 to n, benchmark Approach 1 and print runtime
+    // to reduce risk of error, run the algorithm for "num" number of times
+    // with randomized A and B Matrices
+    cout<< "n"<<"    "<<"N"<<"    "<< "runtime(us)"<<"    "<<"relativeTime=runtime/pow(7,n)"<<endl;
+    for (int i = 1; i< n; i++)
+    {
+        N = pow(2, i);
+        Matrix A, B, C;
+        C = intitializeMatrix(N);
+        {
+        Timer timer;
+        for (int i = 0; i<num; i++)
+        {
+            A = intitializeRandomMatrix(N, rangeLength , rangeOffset);
+            B = intitializeRandomMatrix(N, rangeLength , rangeOffset);
+            recursiveStrassen(A,B,C);
+        }
+        double runtime =timer.getRuntime()/num;
+        cout<< i<<"    "<<N<<"    "<< runtime << "       "<<runtime/pow(7,i)<<endl;
+        }
+    }
+        return 0;
 }
 
-
 //Functions--------------------------------------------------------
+
+Matrix intitializeRandomMatrix(int N, int rangeLength, int rangeOffset)
+{
+    Matrix A;
+    vector<int> A0 = {};
+    for(int i =0 ; i< N; i++) A.push_back (A0);
+   for(int i =0 ; i< N; i++)
+   {
+        for(int j =0 ; j< N;j++)
+        {
+            A[i].push_back(rand() % rangeLength - rangeOffset);
+        }
+   }
+    return A;
+}
 
 //Print all elements of a Matrix
 void display(Matrix &A, string matrixName) { // Display a Vector
@@ -242,6 +290,7 @@ void recursiveStrassen( Matrix &A, Matrix &B, Matrix &C)
         thread M7Thread (recursiveStrassen, ref(S13), ref(S14), ref(M1toM7Vector[7]));
 
         //Make all other threads to wait until the above threads are complete
+
         M1Thread.join();
         M2Thread.join();
         M3Thread.join();
@@ -249,6 +298,30 @@ void recursiveStrassen( Matrix &A, Matrix &B, Matrix &C)
         M5Thread.join();
         M6Thread.join();
         M7Thread.join();
+
+        /*if ( M1Thread.joinable())   M1Thread.join();
+        if ( M1Thread.joinable())   M2Thread.join();
+        if ( M1Thread.joinable())   M3Thread.join();
+        if ( M1Thread.joinable())   M4Thread.join();
+        if ( M1Thread.joinable())   M5Thread.join();
+        if ( M1Thread.joinable())   M6Thread.join();
+        if ( M1Thread.joinable())   M7Thread.join();*/
+
+        /*while (true) if ( M1Thread.joinable())   {M1Thread.join(); break;}
+        while (true) if ( M2Thread.joinable())   {M2Thread.join(); break;}
+        while (true) if ( M3Thread.joinable())   {M3Thread.join(); break;}
+        while (true) if ( M4Thread.joinable())   {M4Thread.join(); break;}
+        while (true) if ( M5Thread.joinable())   {M5Thread.join(); break;}
+        while (true) if ( M6Thread.joinable())   {M6Thread.join(); break;}
+        while (true) if ( M7Thread.joinable())   {M7Thread.join(); break;}*/
+
+        /*Guard G1(M1Thread);
+        Guard G2(M2Thread);
+        Guard G3(M3Thread);
+        Guard G4(M4Thread);
+        Guard G5(M5Thread);
+        Guard G6(M6Thread);
+        Guard G7(M7Thread);*/
 
         // Calculate the result matrix
         // Again I had to define intermediate matrices due to
@@ -285,6 +358,7 @@ Matrix intitializeMatrix(int N)
    }
     return C;
 }
+
 
 //fills a given corner of the matrix
 void insertCornerMatrix(Matrix &A, Matrix &Axy,int x, int y)
@@ -323,7 +397,6 @@ void cornerMatrix(Matrix &A, Matrix &Axy,int x, int y)
          {
              Axy[i][j] = A[i+ x*(N/2)][j+y*(N/2)];
          }
-
      }
 }
 
